@@ -13,8 +13,19 @@ from matplotlib.colors import LogNorm, Normalize
 import multiprocessing
 import time
 from functools import partial
+from scipy.stats import gaussian_kde
+from matplotlib import colors
+from Bifurcation import *
 
 
+
+color=sns.color_palette("colorblind")
+colorGREEN=color[2]
+colorBLUE=color[0]
+colorRED=color[3]
+colorPurple=color[4]
+
+'''
 filename="ACDC_X21ind"
 
 n=['final','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18']
@@ -24,13 +35,13 @@ n=['final','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16
 sys.path.insert(0, 'C:/Users/Administrator/Desktop/Modeling/AC-DC/'+filename)
 import model_equation as meq
 parlist=meq.parlist
-
+'''
 
 ######################################################################33
 #########################################################################
 ###########################################################################
 
-def load(number= n,filename=filename,parlist=parlist):
+def load(number, filename,parlist):
     namelist=[]
     for i,par in enumerate(parlist):
         namelist.append(parlist[i]['name'])
@@ -42,9 +53,16 @@ def load(number= n,filename=filename,parlist=parlist):
     dist_output= np.loadtxt(dist_path)
     df = pd.DataFrame(raw_output, columns = namelist)
     df['dist']=dist_output
+    idx=np.argsort(df['dist'])
     df=df.sort_values('dist',ascending=False)
-    distlist= sorted(df['dist'])
     p=[]
+
+    for i in idx:
+        p0=df.loc[i].tolist()
+        p.append(pars_to_dict(p0,parlist))
+
+
+    '''
     for dist in distlist:
         
         p_0=df[df['dist']==dist]
@@ -53,7 +71,7 @@ def load(number= n,filename=filename,parlist=parlist):
           p0.append(p_0[n].tolist()[0])
         p0=pars_to_dict(p0,parlist)
         p.append(p0)
-
+    '''
     
     return p, df 
 
@@ -105,49 +123,357 @@ def plot(ARA,p,name,nb,tt=120):
 
 
 
+def par_plot(df_par,parlist,cl=None):
+    fig, axs = plt.subplots(len(parlist),len(parlist))#, constrained_layout=True, figsize=(10/inch_cm,10/inch_cm))
 
-def par_plot(df,name,nb,parlist,namelist):
-    #plt.plot(df['K_ARAX'],df['K_ARAY'],'ro')
-    fonts=5
- 
-    for i,par1 in enumerate(namelist):
-        for j,par2 in enumerate(namelist):
-            plt.subplot(len(namelist),len(namelist), i+j*len(namelist)+1)
-            if i == j :
-                plt.hist(df[par1])
-                plt.xlim((parlist[i]['lower_limit'],parlist[i]['upper_limit']))
-            else:
-                plt.scatter(df[par1],df[par2], c=df['dist'], s=0.1, cmap='viridis')# vmin=mindist, vmax=maxdist)
-                plt.xlim((parlist[i]['lower_limit'],parlist[i]['upper_limit']))
-                plt.ylim((parlist[j]['lower_limit'],parlist[j]['upper_limit']))
-            if i > 0 and j < len(namelist)-1 :
-                plt.xticks([])
-                plt.yticks([])
-            else:
-                if i==0 and j!=len(namelist)-1:
-                    plt.xticks([])
-                    plt.ylabel(par2,fontsize=fonts)
-                    plt.yticks(fontsize=fonts,rotation=90)
-                if j==len(namelist)-1 and i != 0:
-                    plt.yticks([])
-                    plt.xlabel(par1,fontsize=fonts)
-                    plt.xticks(fontsize=fonts)
-                if i==0 and j==len(namelist)-1:
-                    plt.ylabel(par2,fontsize=fonts)
-                    plt.xlabel(par1,fontsize=fonts)
-                    plt.xticks(fontsize=fonts)
-                    plt.yticks(fontsize=fonts,rotation=90)                 
-  #  plt.savefig(name+"/plot/"+nb+'_par_plot.pdf', bbox_inches='tight')
-    plt.savefig(name+"/plot/par/"+nb+'_par_plot.png', bbox_inches='tight', dpi=300)
+    for x in np.arange(len(parlist)):
+        for y in np.arange(len(parlist)):
 
-    plt.close()
-    #plt.show()
+            px=parlist[x]['name']
+            py=parlist[y]['name']
+
+            if x==y:
+                #axs[x,y] = sns.distplot(df_par[px])
+                axs[x,y].hist(df_par[px],bins=20, density=True)
+                axs[x,y].set_xlim(parlist[x]['lower_limit'],parlist[x]['upper_limit'])
+                #sns.kdeplot(ax=axs[x, y],x=df_par[px])
+
+            elif y>x:
+                txt=df_par[px][0]
+                corr=np.corrcoef(df_par[px],df_par[py])[0, 1] #pearson correlation
+                corr_r=np.round(corr,2)
+                axs[x,y].imshow([[corr],[corr]], vmin=-1, vmax=1, cmap="bwr",aspect="auto")
+                axs[x,y].text(0,0.5,corr_r,fontsize=8,ha='center', va='center')
+
+            elif y<x:
+                #z = gaussian_kde(df_par[px])(df_par[py])
+                #idx = z.argsort()
+                #xx, yy, z = df_par[px][idx], df_par[py][idx], z[idx]
+                #axs[x,y].scatter(xx,yy,c=z, s=0.1, cmap='viridis')# vmin=mindist, vmax=maxdist)
+                if cl==None:
+                    axs[x,y].hist2d(df_par[py],df_par[px],bins=15, norm = colors.LogNorm())
+                else:
+                    axs[x,y].scatter(df_par[py],df_par[px],c=cl, s=0.1, cmap='viridis')# vmin=mindist, vmax=maxdist)
+
+                axs[x,y].set_xlim(parlist[y]['lower_limit'],parlist[y]['upper_limit'])
+                axs[x,y].set_ylim(parlist[x]['lower_limit'],parlist[x]['upper_limit'])
+
+
+            
+            niceaxis(axs,x,y,px,py,parlist,parlist,6)
+
+    plt.subplots_adjust(wspace=None, hspace=None)
+
+    return axs
     
 
 
+def niceaxis(axs,x,y,px,py,kx,ky,size):
+        #axs[x,y].set_ylim(-0.1,1.1)
+        #if x==0:
+        #    axs[x,y].set_title(py,fontsize=size)
+        
+        if y==0:
+            axs[x,y].set_ylabel(px,fontsize=size,rotation=45,ha='right')
+            axs[x,y].tick_params(axis='y', labelsize=size-2)
+
+            if x!=len(kx)-1:
+                    axs[x,y].set_xticks([])
+                    axs[x,y].set_xticklabels([])
+            #axs[x,y].set_yticks([])
+
+        if x==len(kx)-1:
+            axs[x,y].set_xlabel(py,fontsize=size,rotation=45)
+            axs[x,y].tick_params(axis='x', labelsize=size-2)
+
+            if y!=0:
+                    axs[x,y].set_yticks([])
+                    axs[x,y].set_yticklabels([])
+
+        if y!=0 and x!=len(kx)-1:
+            axs[x,y].set_xticks([])
+            axs[x,y].set_yticks([])
+            axs[x,y].set_xticklabels([])
+            axs[x,y].set_yticklabels([])
+        #if x==len(kx)-1:
+        #   axs[x,y].set_xlabel('AHL')
+        return axs
+
+
+def heatmap_allroound(ARA,filename,parlist,n,meq):
+
+
+    fig,axs=plt.subplots(3,len(n),constrained_layout=True, figsize=(len(n),3))
+    for i,ni in enumerate(n):
+        p, df= load(ni,filename,meq.parlist)
+        for j,jj in enumerate(np.array([-1,500,0])):
+            X,Y,Z = meq.model(ARA,p[jj],totaltime=120)
+       # print(X.shape)
+
+            axs[j,i].imshow(np.log10(X), aspect="auto", cmap="Reds")
+           
+            d=np.round(meq.distance(ARA,p[jj]),2)
+            axs[j,i].set_title(('d = ' + str(d)), fontsize=6)
+            axs[j,i].tick_params(axis='y', labelsize=6)
+            axs[j,i].tick_params(axis='x', labelsize=6)
+            axs[j,i].set_xlabel("S",fontsize=6)
+            axs[j,i].set_ylabel("time",fontsize=6)
 
 
 
+
+
+def barplot(df,parlist):
+    namelist=[]
+    for i,par in enumerate(parlist):
+        namelist.append(parlist[i]['name'])
+    mean=np.array(df.mean().tolist()[:-1])
+    sd=np.array(df.std().tolist()[:-1])
+    median=np.array(df.median().tolist()[:-1])
+    x_pos = np.arange(len(parlist))
+
+
+   # mean=sd/mean
+    namelist=np.array(namelist)
+    #idx=np.argsort(np.abs(sd))
+    #idx=np.argsort(np.abs(sd/mean))
+    idx=np.argsort(x_pos)
+
+    plt.bar(x_pos,mean[idx],color='black')
+    plt.errorbar(x_pos,mean[idx],yerr=sd[idx], ecolor='k', linestyle='')
+
+
+    #plt.plot(x_pos,median[:-1],'ro')
+    plt.xticks(x_pos, namelist[idx], rotation=45, fontsize=8)
+    plt.ylabel("parameter mean")# fontsize=8)
+
+
+
+def bifuplot(ARA,filename,p,meq,dummy):
+
+    ss=meq.findss2(ARA,p) 
+    A=meq.jacobianMatrix2(ARA,ss,p)
+    J=np.nan_to_num(A)
+
+    eigvals, eigvecs =np.linalg.eig(J)
+    stability_array=np.apply_along_axis(getStability, 2, eigvals)
+
+    idx=np.where(stability_array==2)
+
+    m=np.copy(stability_array)
+    m[m!=1]=0
+    stable_matrix = m*ss[:,:,0]
+    stable_matrix[stable_matrix ==0]=np.nan
+
+    m=np.copy(stability_array)
+    m[m!=2]=0
+    oscil_matrix = m/2*ss[:,:,0]
+    oscil_matrix[oscil_matrix ==0]=np.nan
+  
+    low=[]
+    high=[]
+    idx = np.argwhere(stability_array==2)
+    
+    c=0
+    for ai,a in enumerate(ARA):
+        l=np.nan
+        h=np.nan
+        if ai == idx[c][0]:
+            init=ss[idx[c][0],idx[c][1]]+1e-10
+            l,h = limitcycle(ai,ss,ARA,init,p,dummy,meq)
+            l=l[0]
+            h=h[0]
+            if c!=len(idx)-1:
+                c+=1
+        low.append(l)
+        high.append(h)
+
+    m=np.copy(stability_array)
+    m[m!=3]=0
+    unstable_matrix = m/3*ss[:,:,0]
+    unstable_matrix[unstable_matrix ==0]=np.nan
+
+    plt.plot(ARA,stable_matrix,'-', c=colorRED)
+    plt.plot(ARA,unstable_matrix,'--', c=colorRED)
+    plt.fill_between(ARA,low,high,alpha=0.5,facecolor=colorBLUE)
+    plt.plot(ARA,oscil_matrix,'--', c=colorBLUE)
+    plt.plot(ARA,low,'-',c=colorBLUE)
+    plt.plot(ARA,high,'-',c=colorBLUE)
+
+    '''
+    plt.plot(ARA,M[:,i,0],'-b',linewidth=1)
+    plt.plot(ARA,m[:,i,0],'-b',linewidth=1)
+    plt.fill_between(ARA,M[:,i,0],m[:,i,0],alpha=0.2,facecolor='blue')
+    '''
+    plt.yscale('log')
+    plt.xscale('log')
+
+
+
+
+def bifuplot_all(ARA,filename,p,meq,k=0,dummy=0):
+    if k==0:
+        coll=colorRED
+    if k==1:
+        coll =colorBLUE
+    if k==2:
+        coll=colorGREEN
+    ss=meq.findss2(ARA,p) 
+    A=meq.jacobianMatrix2(ARA,ss,p)
+    J=np.nan_to_num(A)
+
+    eigvals, eigvecs =np.linalg.eig(J)
+    stability_array=np.apply_along_axis(getStability, 2, eigvals)
+
+    idx=np.where(stability_array==2)
+
+    m=np.copy(stability_array)
+    m[m!=1]=0
+    stable_matrix = m*ss[:,:,k]
+    stable_matrix[stable_matrix ==0]=np.nan
+
+    m=np.copy(stability_array)
+    m[m!=2]=0
+    oscil_matrix = m/2*ss[:,:,k]
+    oscil_matrix[oscil_matrix ==0]=np.nan
+  
+    low=[]
+    high=[]
+    idx = np.argwhere(stability_array==2)
+    
+    c=0
+    for ai,a in enumerate(ARA):
+        l=np.nan
+        h=np.nan
+        if ai == idx[c][0]:
+            init=ss[idx[c][0],idx[c][1]]+1e-10
+            l,h = limitcycle(ai,ss,ARA,init,p,dummy,meq)
+            l=l[k]
+            h=h[k]
+            if c!=len(idx)-1:
+                c+=1
+        low.append(l)
+        high.append(h)
+
+    m=np.copy(stability_array)
+    m[m!=3]=0
+    unstable_matrix = m/3*ss[:,:,k]
+    unstable_matrix[unstable_matrix ==0]=np.nan
+
+    plt.plot(ARA,stable_matrix,'-', c=coll)
+    plt.plot(ARA,unstable_matrix,'--', c=coll)
+    plt.fill_between(ARA,low,high,alpha=0.5,facecolor=coll)
+    plt.plot(ARA,oscil_matrix,'--', c=coll)
+    plt.plot(ARA,low,'-',c=coll)
+    plt.plot(ARA,high,'-',c=coll)
+
+    '''
+    plt.plot(ARA,M[:,i,0],'-b',linewidth=1)
+    plt.plot(ARA,m[:,i,0],'-b',linewidth=1)
+    plt.fill_between(ARA,M[:,i,0],m[:,i,0],alpha=0.2,facecolor='blue')
+    '''
+    plt.yscale('log')
+    plt.xscale('log')
+
+
+def bifuplot_grid(axs,i,j,ARA,filename,p,meq,dummy):
+
+    ss=meq.findss2(ARA,p) 
+    A=meq.jacobianMatrix2(ARA,ss,p)
+    J=np.nan_to_num(A)
+    eigvals, eigvecs =np.linalg.eig(J)
+    stability_array=np.apply_along_axis(getStability, 2, eigvals)
+
+    idx=np.where(stability_array==2)
+
+    m=np.copy(stability_array)
+    m[m!=1]=0
+    stable_matrix = m*ss[:,:,0]
+    stable_matrix[stable_matrix ==0]=np.nan
+
+    m=np.copy(stability_array)
+    m[m!=2]=0
+    oscil_matrix = m/2*ss[:,:,0]
+    oscil_matrix[oscil_matrix ==0]=np.nan
+  
+    low=[]
+    high=[]
+
+
+    c=0
+    for ai,a in enumerate(ARA):
+        idx = np.argwhere(stability_array[ai]==2)
+        if len(idx)>0:
+            init=ss[ai,idx[0][0]]+1e-10
+        else: 
+            init=ss[ai,0]+1e-10
+        l=np.nan
+        h=np.nan
+
+        #if ai == idx[c][0]:
+            #init=ss[idx[c][0],idx[c][1]]+1e-10
+        #init=[0,0,0]
+        l,h = limitcycle(ai,ss,ARA,init,p,dummy,meq)
+        l=l[0]
+        h=h[0]
+        #    if c!=len(idx)-1:
+        #        c+=1
+        low.append(l)
+        high.append(h)
+  #  else:
+   #     low=np.ones(len(ARA))*np.nan
+    #    high=np.ones(len(ARA))*np.nan
+
+
+    m=np.copy(stability_array)
+    m[m!=3]=0
+    unstable_matrix = m/3*ss[:,:,0]
+    unstable_matrix[unstable_matrix ==0]=np.nan
+
+    axs[i,j].plot(ARA,stable_matrix,'-', c=colorRED)
+    axs[i,j].plot(ARA,unstable_matrix,'--', c=colorRED)
+    axs[i,j].fill_between(ARA,low,high,alpha=0.5,facecolor=colorBLUE)
+    axs[i,j].plot(ARA,oscil_matrix,'--', c=colorBLUE)
+    axs[i,j].plot(ARA,low,'-',c=colorBLUE)
+    axs[i,j].plot(ARA,high,'-',c=colorBLUE)
+
+    '''
+    plt.plot(ARA,M[:,i,0],'-b',linewidth=1)
+    plt.plot(ARA,m[:,i,0],'-b',linewidth=1)
+    plt.fill_between(ARA,M[:,i,0],m[:,i,0],alpha=0.2,facecolor='blue')
+    '''
+    axs[i,j].set_yscale('log')
+    axs[i,j].set_xscale('log')
+
+
+    return axs
+
+def plot_bifu_grid(pi,p,ARA,filename,meq):
+    ms= (np.sqrt(len(pi)))
+
+    if( ms != round(ms)):
+        ms=int(ms+1)
+    else:
+        ms=int(ms)
+
+    #ms= int(np.round((np.sqrt(len(pi)))))
+    s=np.max((2,ms))
+
+    fig,axs= plt.subplots(s,s, figsize=(s*2,s*2),constrained_layout=True)
+
+
+    x=0
+    y=0
+    for i in pi:
+        i=int(i)
+        bifuplot_grid(axs,x,y,ARA,filename,p[i],meq,i)
+        #axs[x,y].text(ARA[-2],10e-5, ("p "+str(i)),fontsize=8,ha='center', va='center')
+        axs[x,y].set_title(("p "+str(i)),fontsize=6)
+        #niceaxis(axs,x,y,i,i,pi,pi,6)
+        x+=1
+        if x==s:
+            x=0
+            y+=1
 
 
 ##############################################################################################################3   

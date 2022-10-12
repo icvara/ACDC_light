@@ -20,10 +20,11 @@ tt=120 #totaltime
 tr=20 #transient time
 node="X"
 
+
 #list for ACDC
 parlist = [ 
     #first node X param
-    {'name' : 'K_ARAX', 'lower_limit':-4.0,'upper_limit':-1.0}, 
+    {'name' : 'K_ARAX', 'lower_limit':-4.0,'upper_limit':-1.0},
     {'name' : 'n_ARAX','lower_limit':0.5,'upper_limit':2.0},
     {'name' : 'K_XY','lower_limit':-10.0,'upper_limit':2.0},
     {'name' : 'n_XY','lower_limit':0.5,'upper_limit':2.0},
